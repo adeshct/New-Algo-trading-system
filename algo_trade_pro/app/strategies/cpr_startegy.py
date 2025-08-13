@@ -26,7 +26,7 @@ MODEL_DIR.mkdir(parents=True, exist_ok=True)
 class CPRMetaMLStrategy(BaseStrategy):
     """Production CPR Meta-Label Strategy with Probability-Calibrated Ensemble."""
 
-    def __init__(self, name="CPR_Meta_ML", symbols=None, quantity=1, atm_offset=0):
+    def __init__(self, name="CPR_Meta_ML", symbols=None, quantity=75, atm_offset=0):
         symbols = symbols or ["NIFTY 50"]
         super().__init__(name, symbols,min_data_points= 2)
         self.qty = quantity
@@ -170,7 +170,7 @@ class CPRMetaMLStrategy(BaseStrategy):
                 self.qty = 75
             elif sym == 'BANKNIFTY':
                 self.qty = 35
-                
+
             trade_signal = self._create_signal(
                 symbol=opt_symbol,
                 action="BUY",

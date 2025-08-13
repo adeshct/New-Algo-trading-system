@@ -140,7 +140,7 @@ class TradeExecutor:
                 status = status_result.get('status', 'UNKNOWN')
                 trade_id = self.pending_orders[order_id]
                 logger.info(f"Order status: {status}")
-                if status == 'FILLED':
+                if status == 'COMPLETED':
                     filled_price = status_result.get('filled_price')
                     self._handle_fill(trade_id, filled_price)
                     orders_to_remove.append(order_id)

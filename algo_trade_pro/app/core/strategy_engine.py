@@ -1,7 +1,7 @@
 import time
 import threading
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 
 from app.queue.signal_queue import market_data_queue
@@ -14,6 +14,8 @@ from app.strategies.cpr_startegy import CPRMetaMLStrategy
 from app.services.logger import get_logger
 from app.config.settings import get_settings
 from app.strategies.registry import STRATEGY_REGISTRY
+from app.services.utils import getTimeOfDay
+
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -165,6 +167,7 @@ class StrategyEngine:
             # if len(self.symbol_data[symbol]) > 100:
             #     self.symbol_data[symbol] = self.symbol_data[symbol].tail(100)
     
+   
 
     
     def _execute_strategies(self):
@@ -179,8 +182,13 @@ class StrategyEngine:
                 logger.info(f"Required Symbols: {required_symbols}")
                 # Check if we have enough data
                 symbol_data = {}
+                now = datetime.now()
+                if now.minute % 5 != 0:
+                    mins_to_wait = 5 - now.minute % 5
+                    logger.info("Sleeping for %d minutes", mins_to_wait)
+                    time.sleep(timedelta.total_seconds(getTimeOfDay(hours=int(now.hour+1 if int(now.minute+mins_to_wait)==60 else now.hour), minutes=int(0 if int(now.minute+mins_to_wait)==60 else int(now.minute+mins_to_wait)),seconds=0) - now))
 
-                if strategy.name!="CPR_Meta_ML":
+                if strategy.name!="CPR_Meta_ML" and now.minute % 5 == 0:
                     for symbol in required_symbols:
                         with self._lock:
                             if symbol in self.symbol_data and len(self.symbol_data[symbol]) >= strategy.min_data_points:
@@ -190,9 +198,9 @@ class StrategyEngine:
                         with self._lock:
                             if symbol in self.symbol_data and len(self.symbol_data[symbol]) >= strategy.min_data_points:
                                 df = self.symbol_data[symbol].copy()
-                                #logger.info(f"df before calling resample: {df}")
+                                logger.info(f"df before calling resample: {df}")
                                 # Resample to 5-min bars
-                                #logger.info("Calling for resampling")
+                                logger.info("Calling for resampling")
                                 if not df.index.inferred_type == 'datetime64':
                                     df.index = pd.to_datetime(df.index)
                                 df_5min = resample(df) #resample to 5 mins
@@ -223,7 +231,7 @@ class StrategyEngine:
             # Add to trade signal queue
             trade_signal_queue.put(signal)
             
-            logger.info(f"Generated signal: {signal['action']} {signal['symbol']} "
+            logger.info(f"Generated signal: {signal['action']} {signal['symbol']} Quanity is {signal['quantity']} "
                        f"at {signal['price']} (Strategy: {strategy_name})")
             
         except Exception as e:

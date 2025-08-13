@@ -11,6 +11,7 @@ from app.services.logger import get_logger
 from app.services.kite import get_kite_client, get_ws_client
 import yfinance as yf
 from datetime import datetime
+import pandas as pd
 from typing import List, Dict, Any
 
 import random
@@ -37,9 +38,12 @@ class ZerodhaBroker(BrokerBase):
 
     def __init__(self, kite_client: KiteConnect = None):
         super().__init__(None, None, None)
-
         self.kite = get_kite_client()
-        self.kws = get_ws_client()
+        self.kws = None
+        self.instruments_df = pd.DataFrame()
+        self.token_map = {}
+        self.symbol_map = {}
+        self._load_instruments()
 
     def _connect(self):
         """Create Kite client and set session"""
@@ -213,35 +217,52 @@ class ZerodhaBroker(BrokerBase):
             logger.error(f"[Zerodha] Failed to fetch pending orders: {e}")
             return []
 
-    def start(self):
-        t = threading.Thread(target=self.kws.connect, kwargs={'threaded': True})
-        t.daemon = True
-        t.start()
+    def _load_instruments(self):
+        try:
+            instruments = self.kite.instruments("NSE")
+            logger.info("Instruments loaded")
+            df = pd.DataFrame(instruments)
+            self.instruments_df = df
+            self.token_map = dict(zip(df.tradingsymbol.str.upper(), df.instrument_token))
+            self.symbol_map = {v: k for k, v in self.token_map.items()}
+        except Exception as e:
+            logger.error(f"Failed loading instruments: {e}")
 
-    def on_connect(self, ws, response):
-        print("WebSocket connected.")
-        ws.subscribe(self.tokens)
+    
+    def get_instrument_token(self, symbol: str) -> int:
+        return self.token_map.get(symbol.upper())
 
-    def on_close(self, ws, code, reason):
-        print("WebSocket closed:", reason)
+    def resolve_symbol(self, token: int) -> str:
+        return self.symbol_map.get(token, str(token))
 
-    def on_ticks(self, ws, ticks):
-        for tick in ticks:
-            symbol = self.resolve_symbol(tick["instrument_token"])
-            market_data = {
-                'symbol': symbol,
-                'timestamp': tick.get("timestamp"),
-                'open': tick.get("ohlc", {}).get("open", tick["last_price"]),
-                'high': tick.get("ohlc", {}).get("high", tick["last_price"]),
-                'low': tick.get("ohlc", {}).get("low", tick["last_price"]),
-                'close': tick["last_price"],
-                'volume': tick.get("volume", 0),
-                'ltp': tick["last_price"]
-            }
-            self.out_queue.put(market_data)
+    def create_ws_client(self, out_queue):
+        from app.services.kite import get_ws_client
+        nifty_token = self.get_instrument_token("NIFTY 50")
+        self.subscribe_tokens = [nifty_token]
+        def on_ticks(ws, ticks):
+            for tick in ticks:
+                if tick["instrument_token"] == nifty_token:
+                    sym = self.resolve_symbol(tick["instrument_token"])
+                    #logger.info("Inside ticks")
+                    market_data = {
+                        "symbol": sym,
+                        "timestamp": tick.get("timestamp", datetime.now()),
+                        "open": tick.get("ohlc", {}).get("open", tick["last_price"]),
+                        "high": tick.get("ohlc", {}).get("high", tick["last_price"]),
+                        "low": tick.get("ohlc", {}).get("low", tick["last_price"]),
+                        "close": tick["last_price"],
+                        "volume": tick.get("volume", 0),
+                    }
+                    #logger.info(f"Market Data for {sym} is fetched. Market data: {market_data}")
+                    out_queue.put(market_data)
 
-    def resolve_symbol(self, instrument_token):
-        # You need a mapping from token <-> symbol
-        # This could call a dict or your instrument dump
-        return "NIFTY 50"
+        def on_connect(ws, resp):
+            logger.info("Zerodha WS connected, subscribing...")
+            ws.subscribe(list(self.subscribe_tokens))
+            ws.set_mode(ws.MODE_FULL, list(self.subscribe_tokens))
 
+        def on_close(ws, code, reason):
+            logger.warning(f"Zerodha WS closed: {reason}")
+
+        self.kws = get_ws_client(on_ticks=on_ticks, on_connect=on_connect, on_close=on_close)
+        return self.kws

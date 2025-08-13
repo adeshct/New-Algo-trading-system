@@ -30,20 +30,14 @@ class DataCollector:
         
     def add_symbols(self, symbols):
         with self._lock:
-            for symbol in symbols:
-                sym = symbol.upper()
-                self.symbols.add(symbol.upper())
+            for sym in symbols:
+                self.symbols.add(sym.upper())
                 token = self.broker.get_instrument_token(sym)
-                if token is not None:
-                    self.token_map[token] = sym
+                if token:
                     self.subscribe_tokens.add(token)
-                else:
-                    logger.warning(f"Instrument token not found for symbol: {sym}")
-        logger.info(f"Added symbols for data collection: {symbols}")
-
-        # If websocket collector already running, update subscription
-        if self.ws_collector and self.is_running:
-            self.ws_collector.subscribe(list(self.subscribe_tokens))
+        logger.info(f"Added symbols: {symbols}")
+        if hasattr(self.broker, "subscribe_tokens"):
+            self.broker.subscribe_tokens = self.subscribe_tokens
             
     def remove_symbols(self, symbols):
         with self._lock:
@@ -56,9 +50,6 @@ class DataCollector:
                     self.token_map.pop(token, None)
         logger.info(f"Removed symbols from data collection: {symbols}")
 
-        if self.ws_collector and self.is_running:
-            self.ws_collector.unsubscribe(list(self.subscribe_tokens))
-
     def run(self):
         """Start websocket collector and run indefinitely."""
         # if not self.subscribe_tokens:
@@ -67,42 +58,44 @@ class DataCollector:
 
         self.is_running = True
         logger.info("Starting DataCollector with websocket...")
-
-        api_key = self.broker.api_key  # Assuming broker exposes credentials
-        access_token = self.broker.access_token
-
+        
         # Create an output queue where websocket events are put
         self.out_queue = websocket_queue
+        self.ws_client = self.broker.create_ws_client(self.out_queue)
 
-        # Initialize websocket collector with tokens and out queue
-        self.ws_collector = WebsocketCollector(api_key, access_token, list(self.subscribe_tokens), self.out_queue)
-        self.ws_collector.start()
-
+        # Thread to start WS connection
+        threading.Thread(target=self.ws_client.connect, kwargs={"threaded": True}, daemon=True).start()
+        logger.info("Threading started for WS_CLIENT")
         # Consume from websocket queue and route to market_data_queue
         while self.is_running:
             try:
+                #logger.info("Inside Try")
                 tick = self.out_queue.get(timeout=1)  # Wait for new ticks
 
                 symbol = tick["symbol"]
+                #logger.info(f"tick data: {tick}")
                 with self._lock:
+                    #logger.info("Inside lock")
                     if symbol not in self.data_cache:
                         self.data_cache[symbol] = []
                     self.data_cache[symbol].append(tick)
-
+                    #logger.info("Halfway through lock")
                     if len(self.data_cache[symbol]) > 200:
                         self.data_cache[symbol] = self.data_cache[symbol][-200:]
 
                 market_data_queue.put(tick)
                 logger.debug(f"DataCollector pushed tick for {symbol} at {tick['timestamp']}")
 
-            except Exception as ex:
+            except Exception as e:
                 # Timeout or other exception can be ignored/logged
+                logger.error(f"Inside Exception: execept: {e}")
                 continue
 
     def stop(self):
         self.is_running = False
-        if self.ws_collector:
-            self.ws_collector.stop()
+        if self.ws_client:
+            try: self.ws_client.close()
+            except: pass
         logger.info("DataCollector stopping and websocket closed")
 
     def get_historical_data(self, symbol: str, periods: int = 100) -> pd.DataFrame:

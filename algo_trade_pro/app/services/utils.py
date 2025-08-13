@@ -73,9 +73,9 @@ def get_previous_session_ohlc(df: pd.DataFrame) -> pd.Series:
     grouped = df.groupby(df.index.date)  # groups by datetime.date
 
     if len(grouped) < 2:
-            high = 24783.70
-            low = 24650.00
-            close = 24707.80
+            high = 24702.60
+            low = 24465.65
+            close = 24487.40
             return pd.Series({"high": high, "low": low, "close": close})
         #raise ValueError("Not enough data to find previous session OHLC")
 
