@@ -1,6 +1,7 @@
 # app/services/utils.py
 
 import datetime as dt
+from datetime import datetime
 import pandas as pd
 
 def nearest_strike(price: float, step: int = 100) -> int:
@@ -50,6 +51,11 @@ def weekly_option_symbol(symbol: str, strike: int, option_type: str, expiry_date
     # SYMBOL + YY + MON + DD + STRIKE + CE/PE
     return f"{symbol}{str(expiry_date.year)[2:]}{month_abbr}{strike}{option_type.upper()}"
 
+def getTimeOfDay(hours, minutes, seconds, dateTimeObj = None):
+    if dateTimeObj == None:
+        dateTimeObj = datetime.now()
+        dateTimeObj = dateTimeObj.replace(hour=hours, minute=minutes, second=seconds, microsecond=0)
+        return dateTimeObj
 
 def get_previous_session_ohlc(df: pd.DataFrame) -> pd.Series:
     """
