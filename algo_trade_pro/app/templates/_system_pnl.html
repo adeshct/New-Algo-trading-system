@@ -1,0 +1,18 @@
+<div class="pnl-display">
+  <div class="pnl-item">
+    <span class="pnl-label">Today's P&L</span>
+    <span class="pnl-value {{ 'positive' if metrics.today_pnl >= 0 else 'negative' }}">₹{{ metrics.today_pnl | round(2) }}</span>
+  </div>
+  <div class="pnl-item">
+    <span class="pnl-label">Total P&L</span>
+    <span class="pnl-value {{ 'positive' if metrics.total_pnl >= 0 else 'negative' }}">₹{{ metrics.total_pnl | round(2) }}</span>
+  </div>
+  <div class="pnl-item">
+    <span class="pnl-label">Win Rate</span>
+    <span class="pnl-value">{{ (metrics.win_rate * 100) | round(2) }}%</span>
+  </div>
+  <div class="pnl-item">
+    <span class="pnl-label">Max Drawdown</span>
+    <span class="pnl-value negative">₹{{ metrics.max_drawdown | round(2) }}</span>
+  </div>
+</div>

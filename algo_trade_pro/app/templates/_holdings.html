@@ -1,0 +1,25 @@
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Quantity</th>
+          <th>Avg Price</th>
+          <th>LTP</th>
+          <th>P&L</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in holdings %}
+          <tr>
+            <td>{{ h.tradingsymbol }}</td>
+            <td>{{ h.quantity }}</td>
+            <td>₹{{ "%.2f"|format(h.average_price or 0) }}</td>
+            <td>₹{{ "%.2f"|format(h.last_price or 0) }}</td>
+            <td class="{{ 'positive' if h.pnl >= 0 else 'negative' }}">
+              ₹{{ h.pnl | round(2) }}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+

@@ -1,0 +1,31 @@
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Symbol</th>
+      <th>Side</th>
+      <th>Quantity</th>
+      <th>Price</th>
+      <th>Timestamp</th>
+      <th>Status</th>
+      <th>P&L</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in trades %}
+      <tr>
+        <td>{{ t.id or '' }}</td>
+        <td>{{ t.symbol or '' }}</td>
+        <td>{{ t.side or '' }}</td>
+        <td>{{ t.quantity or '' }}</td>
+        <td>₹{{ '{:.2f}'.format(t.price or 0) }}</td>
+        <td>{{ t.timestamp or '' }}</td>
+        <td>{{ t.status or '' }}</td>
+        <td>₹{{ '{:.2f}'.format(t.pnl or 0) if t.pnl is not none else '-' }}</td>
+      </tr>
+    {% endfor %}
+    {% if not trades %}
+      <tr><td colspan="8">No trade history available.</td></tr>
+    {% endif %}
+  </tbody>
+</table>

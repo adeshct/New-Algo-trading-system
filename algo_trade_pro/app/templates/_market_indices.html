@@ -1,0 +1,11 @@
+<div class="market-indices">
+  {% for name, data in indices.items() %}
+  <div class="index-item">
+    <span class="index-name">{{ name }}</span>
+    <span class="index-value">{{ data.value | round(2) }}</span>
+    <span class="index-change {{ 'positive' if data.change >= 0 else 'negative' }}">
+      {{ '+' if data.change >= 0 else '' }}{{ data.change | round(2) }} ({{ data.change_pct }}%)
+    </span>
+  </div>
+  {% endfor %}
+</div>

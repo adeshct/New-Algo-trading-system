@@ -1,0 +1,30 @@
+<div id="systemStatusWrapper"
+     hx-get="/api/v1/system/status"
+     hx-swap="innerHTML"
+     hx-disable-cache="true">
+
+  <div class="status-grid">
+    <div class="status-item">
+      <span class="status-label">System Status</span>
+      <span class="status-value {{ 'text-green-600' if status.status == 'Running' else 'text-red-500' }}">
+        {{ status.status }}
+      </span>
+    </div>
+
+    <div class="status-item">
+      <span class="status-label">Active Strategies</span>
+      <span class="status-value">{{ status.strategies_active or 0 }}</span>
+    </div>
+
+    <div class="status-item">
+      <span class="status-label">Thread Status</span>
+      <div class="thread-status">
+        <span class="thread-indicator {{ 'running' if status.data_collector else 'stopped' }}">Data</span>
+        <span class="thread-indicator {{ 'running' if status.strategy_engine else 'stopped' }}">Strategy</span>
+        <span class="thread-indicator {{ 'running' if status.trade_executor else 'stopped' }}">Trade</span>
+        <span class="thread-indicator {{ 'running' if status.risk_manager else 'stopped' }}">Monitor</span>
+      </div>
+    </div>
+  </div>
+
+</div>

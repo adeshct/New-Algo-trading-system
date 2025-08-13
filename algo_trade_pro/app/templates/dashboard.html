@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AlgoTrade Pro – Live Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.4"></script>
+    <!-- Plotly.js CDN -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+
+<header class="bg-white shadow p-4 text-center text-2xl font-bold text-indigo-600">
+    💹 AlgoTrade Pro – Live Strategy Dashboard
+</header>
+
+<main class="p-8 max-w-7xl mx-auto space-y-8">
+
+    <!-- Strategy/Trade live table -->
+    <section class="bg-white rounded shadow p-6">
+        <div class="flex justify-between items-center">
+            <h2 class="text-xl font-semibold">Strategies & Performance</h2>
+            <button hx-get="/dashboard/strategy-table" hx-trigger="click" hx-target="#strategy-table-section" class="bg-indigo-600 text-white px-4 py-2 rounded">
+                🔁 Refresh
+            </button>
+        </div>
+        <div id="strategy-table-section"
+             hx-get="/dashboard/strategy-table"
+             hx-trigger="load, every 5s"
+             hx-swap="innerHTML"
+             class="mt-4">
+            <!-- Partial table loads here -->
+            Loading...
+        </div>
+    </section>
+
+    <!-- PnL / Performance chart -->
+    <section class="bg-white rounded shadow p-6">
+        <h2 class="text-xl font-semibold mb-4">📈 Strategy Performance Chart</h2>
+        <div>
+            <select id="strategy-select"
+                    class="border p-2 rounded mb-4"
+                    onchange="loadPNLChart(this.value)">
+                <!-- Filled by JS on page load -->
+            </select>
+        </div>
+        <div id="chart-container"
+             hx-get="/dashboard/pnl-chart?strategy=MA_CrossOver"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <!-- Plotly chart loads here -->
+            Loading chart...
+        </div>
+    </section>
+</main>
+
+<script>
+    // Populate the select dropdown with strategy names from the API on page load
+    async function loadStrategyOptions() {
+        const resp = await fetch('/api/v1/strategies');
+        const strategies = await resp.json();
+        const el = document.getElementById('strategy-select');
+        el.innerHTML = "";
+        for (const name of strategies) {
+            el.innerHTML += `<option value="${name}">${name}</option>`;
+        }
+    }
+    loadStrategyOptions();
+
+    // When a strategy is selected, update the chart via HTMX
+    function loadPNLChart(strategy) {
+        const container = document.getElementById('chart-container');
+        container.setAttribute("hx-get", `/dashboard/pnl-chart?strategy=${encodeURIComponent(strategy)}`);
+        container.removeAttribute("hx-trigger"); // to force htmx to reload now
+        htmx.process(container);
+        // Fire the actual request
+        htmx.ajax('GET', `/dashboard/pnl-chart?strategy=${encodeURIComponent(strategy)}`, {target: '#chart-container'});
+    }
+</script>
+
+</body>
+</html>

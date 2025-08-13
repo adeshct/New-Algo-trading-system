@@ -1,0 +1,12 @@
+<div id="pnl-plotly-chart"></div>
+<script type="text/javascript">
+    const pnlData = {{ pnl_data|tojson }};
+    const layout = {
+        title: '{{ strategy_name }} - PnL Over Time',
+        xaxis: {title: "Trade #"},
+        yaxis: {title: "Cumulative PnL"},
+        margin: {t: 30, l: 50, r: 20, b: 40},
+        plot_bgcolor: "#f9fafb"
+    };
+    Plotly.newPlot('pnl-plotly-chart', [ {x: pnlData.x, y: pnlData.y, type: 'scatter', mode: 'lines+markers', line: {color: '#6366f1'}, marker: {color: '#4ade80'} } ], layout, {responsive: true});
+</script>

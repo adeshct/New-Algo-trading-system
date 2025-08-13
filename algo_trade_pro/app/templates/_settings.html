@@ -1,0 +1,42 @@
+<!-- _settings.html — Broker selection popup modal for auto-login -->
+
+<div id="settings-modal" class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+  <div class="relative bg-white max-w-md w-full rounded-lg shadow-xl p-6">
+    <!-- Close Button -->
+    <button class="absolute top-2 right-3 text-2xl text-gray-400 hover:text-red-600 font-bold"
+            onclick="document.getElementById('settings-modal').remove()">
+      &times;
+    </button>
+
+    <!-- Modal Heading -->
+    <div class="mb-4 text-center">
+      <h2 class="text-xl font-bold text-indigo-700 flex items-center justify-center gap-2">
+        ⚙️ Broker Settings
+      </h2>
+      <p class="text-sm text-gray-500 mt-1">Select a broker and auto-login using saved credentials.</p>
+    </div>
+
+    <!-- Settings Form -->
+    <form id="auto-login-form"
+          hx-post="/api/v1/settings/auto-login"
+          hx-target="body"
+          hx-swap="none"
+          hx-on::after-request="document.getElementById('settings-modal').remove()"
+          class="grid gap-4">
+
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700">Choose Broker</span>
+        <select name="broker" id="broker" class="w-full mt-1 px-3 py-2 border rounded" required>
+          {% for val, label in broker_choices %}
+            <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <button type="submit"
+              class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded shadow mt-2">
+        🔑 Auto Login via Selenium
+      </button>
+    </form>
+  </div>
+</div>

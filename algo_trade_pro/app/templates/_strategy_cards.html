@@ -1,0 +1,51 @@
+<div class="strategies-grid">
+  {% for strat in strategies %}
+    <div class="card strategy-card">
+      <div class="card__header">
+        <h3>{{ strat.name }}</h3>
+        <div class="strategy-controls">
+          <button class="btn btn--sm strategy-toggle"
+                hx-post="/api/v1/strategies/control"
+                hx-headers='{"Content-Type":"application/json"}'
+                hx-vals='{"strategy_name": "{{ strat.name }}", "enable": {{ "true" if not strat.enabled else "false" }}}'
+                hx-swap="none"
+                hx-trigger="click"
+                hx-on::after-request="htmx.ajax('GET', '/dashboard/strategy-cards', {target: '#strategy-cards'})">
+            {{ "Enable" if not strat.enabled else "Disable" }}
+          </button>
+
+        </div>
+      </div>
+      <div class="card__body">
+        <div class="strategy-stats">
+          <div class="stat-item">
+            <span class="stat-label">Signals:</span>
+            <span class="stat-value">{{ strat.metrics.signals_generated or 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Trades:</span>
+            <span class="stat-value">{{ strat.metrics.trades_executed or 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">P&L:</span>
+            <span class="stat-value {{ 'positive' if strat.metrics.total_pnl >= 0 else 'negative' }}" 
+                  id="pnl-{{ strat.name }}">₹{{ strat.metrics.total_pnl | round(2) }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Win Rate:</span>
+            <span class="stat-value" id="win-{{ strat.name }}">{{ (strat.metrics.win_rate * 100) | round(2) }}%</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Sharpe:</span>
+            <span class="stat-value">{{ strat.metrics.sharpe_ratio | round(3) }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Max DD:</span>
+            <span class="stat-value negative" id="drawdown-{{ strat.name }}">₹{{ strat.metrics.max_drawdown | round(2) }}</span>
+          </div>
+        </div>
+        <div id="chart-{{ strat.name }}" style="height: 200px; margin-top: 10px;"></div>
+      </div>
+    </div>
+  {% endfor %}
+</div>

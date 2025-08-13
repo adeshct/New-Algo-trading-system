@@ -1,0 +1,39 @@
+<table class="w-full text-left border">
+    <thead class="bg-gray-200">
+    <tr>
+        <th class="p-2">Strategy</th>
+        <th class="p-2">Signals</th>
+        <th class="p-2">Trades</th>
+        <th class="p-2">Win Rate</th>
+        <th class="p-2">Sharpe</th>
+        <th class="p-2">Max Drawdown</th>
+        <th class="p-2">Total PnL (₹)</th>
+        <th class="p-2">Engine</th>
+        <th class="p-2"></th>
+    </tr>
+    </thead>
+    <tbody class="bg-white">
+    {% for strat in strategies %}
+        <tr>
+            <td class="p-2">{{ strat.name }}</td>
+            <td class="p-2">{{ strat.metrics.signals_generated or 0 }}</td>
+            <td class="p-2">{{ strat.metrics.trades_executed or 0 }}</td>
+            <td class="p-2">{{ (strat.metrics.win_rate * 100) | round(2) }}%</td>
+            <td class="p-2">{{ strat.metrics.sharpe_ratio | round(2) }}</td>
+            <td class="p-2">₹{{ strat.metrics.max_drawdown | round(2) }}</td>
+            <td class="p-2 font-bold text-green-700">₹{{ strat.metrics.total_pnl | round(2) }}</td>
+            <td class="p-2">
+                {% if strat.enabled %}<span class="bg-green-200 px-2 text-green-800 rounded">Enabled</span>
+                {% else %}<span class="bg-red-200 px-2 text-red-800 rounded">Disabled</span>{% endif %}
+            </td>
+            <td class="p-2">
+                <button hx-post="/api/v1/strategies/control" hx-vals='{"strategy_name": "{{ strat.name }}", "enable": {{ "true" if not strat.enabled else "false" }}}'
+                        hx-swap="none"
+                        class="rounded px-2 py-1 bg-indigo-200 hover:bg-indigo-300 text-indigo-800">
+                    {{ "Enable" if not strat.enabled else "Disable" }}
+                </button>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>

@@ -1,0 +1,69 @@
+<table class="data-table w-full border text-sm">
+  <thead>
+    <tr>
+      <th>ID</th><th>Symbol</th><th>Side</th><th>Qty</th>
+      <th>Price</th><th>Timestamp</th><th>Status</th><th>P&L</th><th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in trades %}
+      <!-- Add 'bg-yellow-50' if broker-sourced -->
+      <tr class="{% if t.source == 'broker' %}bg-yellow-50{% endif %}">
+        <td>
+          {{ t.id or '' }}
+          {% if t.source == 'broker' %}
+            <span class="text-xs text-yellow-600 font-medium">(broker)</span>
+          {% else %}
+            <span class="text-xs text-gray-400">(db)</span>
+          {% endif %}
+        </td>
+        <td>{{ t.symbol or '' }}</td>
+        <td>{{ t.side or '' }}</td>
+        <td>{{ t.quantity or '' }}</td>
+        <td>₹{{ '{:.2f}'.format(t.price or 0) }}</td>
+        <td>{{ t.timestamp or '' }}</td>
+        <td>{{ t.status or '' }}</td>
+        <td>
+          ₹{{ '{:}'.format(t.pnl or 0) if t.pnl is not none else '-' }}
+        </td>
+        <td>
+          {% if t.source == 'broker' and t.status in ['OPEN', 'TRIGGER PENDING', 'AMO REQ RECEIVED'] %}
+            <!-- CANCEL only for local trades -->
+            <button 
+              class="btn btn--sm btn-cancel"
+              hx-post="/api/v1/trades/cancel"
+              hx-vals='{"order_id": "{{ t.order_id }}", "broker": "zerodha", "status": "{{ t.status }}"}'
+              hx-target="closest tr"
+              hx-swap="none"
+              hx-confirm="Cancel order {{ t.order_id }}?"
+              hx-on::after-request="htmx.trigger('#liveTrades', 'refresh')">
+              Cancel
+            </button>
+          {% elif t.status in ['FILLED', 'ACTIVE'] and t.source != 'broker' %}
+            <!-- EXIT only for local trades -->
+            <button 
+              class="btn btn--sm btn-exit"
+              hx-post="/api/v1/trades/exit"
+              hx-vals='{"order_id": "{{ t.order_id }}", "broker": "zerodha", "status": "{{ t.status }}"}'
+              hx-target="closest tr"
+              hx-swap="none"
+              hx-confirm="Exit position for {{ t.id }}?"
+              hx-on::after-request="htmx.trigger('#liveTrades', 'refresh')">
+              Exit
+            </button>
+          {% else %}
+            <span class="text-gray-400">-</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+
+    {% if not trades %}
+      <tr>
+        <td colspan="9" class="text-center text-gray-500">
+          No live trades (DB empty or query failed)
+        </td>
+      </tr>
+    {% endif %}
+  </tbody>
+</table>

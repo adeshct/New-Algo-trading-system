@@ -1,0 +1,161 @@
+<!-- _report.html: Enhanced Dashboard Report Tab -->
+
+<!-- Date and Branding -->
+<div class="flex flex-col md:flex-row items-center justify-between mb-6 bg-gradient-to-r from-indigo-50 to-white px-4 py-3 rounded shadow">
+  <div>
+    <h1 class="text-2xl font-extrabold tracking-tight text-indigo-700 flex items-center gap-2 mb-2">
+      <span>📊</span> <span>AlgoTrade Pro – Daily Report</span>
+    </h1>
+    <div class="text-xs text-gray-600">
+      <span class="mr-2">Report Date: <span class="font-semibold text-indigo-800">{{ report_date }}</span></span>
+      <span>Generated: <span class="font-semibold">{{ generation_time }}</span></span>
+    </div>
+  </div>
+  <button onclick="window.print()"
+          class="mt-4 md:mt-0 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded shadow transition-colors no-print">
+    🖨 Print Report
+  </button>
+</div>
+
+<!-- Summary Metric Cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white p-4 rounded shadow flex items-center gap-2">
+    <div class="bg-indigo-100 p-2 rounded-full text-indigo-600 text-xl">📈</div>
+    <div>
+      <div class="text-xs text-gray-500 uppercase">Total Trades</div>
+      <div class="text-xl font-bold">{{ metrics.total_trades }}</div>
+    </div>
+  </div>
+  <div class="bg-white p-4 rounded shadow flex items-center gap-2">
+    <div class="bg-green-100 p-2 rounded-full text-green-600 text-xl">✅</div>
+    <div>
+      <div class="text-xs text-gray-500 uppercase">Win Rate</div>
+      <div class="text-xl font-bold">{{ (metrics.win_rate*100) | round(2) }}%</div>
+      <div class="mt-1 h-2 w-full bg-gray-200 rounded">
+        <div class="bg-green-400 h-2 rounded" style="width: {{ (metrics.win_rate*100) | round(1) }}%"></div>
+      </div>
+    </div>
+  </div>
+  <div class="bg-white p-4 rounded shadow flex items-center gap-2">
+    <div class="bg-gray-100 p-2 rounded-full {% if metrics.total_pnl >= 0 %}text-green-700{% else %}text-red-700{% endif %} text-xl">₹</div>
+    <div>
+      <div class="text-xs text-gray-500 uppercase">Total P&L</div>
+      <div class="text-xl font-bold {% if metrics.total_pnl >= 0 %}text-green-700{% else %}text-red-700{% endif %}">
+        {{ metrics.total_pnl | round(2) }}
+      </div>
+    </div>
+  </div>
+  <div class="bg-white p-4 rounded shadow flex items-center gap-2">
+    <div class="bg-red-100 p-2 rounded-full text-red-600 text-xl">📉</div>
+    <div>
+      <div class="text-xs text-gray-500 uppercase">Max Drawdown</div>
+      <div class="text-xl font-bold text-red-600">
+        {{ metrics.max_drawdown | round(2) }}
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Extra Metrics Row -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+  <div class="bg-white p-4 rounded shadow flex items-center gap-2">
+    <div class="bg-yellow-100 p-2 rounded-full text-yellow-700 text-xl">⭐</div>
+    <div>
+      <div class="text-xs text-gray-500 uppercase">Sharpe Ratio</div>
+      <div class="text-lg font-bold text-yellow-700">{{ metrics.sharpe_ratio | round(2) }}</div>
+    </div>
+  </div>
+  <div class="bg-white p-4 rounded shadow flex items-center gap-2">
+    <div class="bg-blue-100 p-2 rounded-full text-blue-700 text-xl">📊</div>
+    <div>
+      <div class="text-xs text-gray-500 uppercase">Avg Trade PnL</div>
+      <div class="text-lg font-bold text-blue-700">{{ metrics.avg_trade_pnl | round(2) }}</div>
+    </div>
+  </div>
+  <div></div>
+  <div></div>
+</div>
+
+<!-- Strategy Performance Table -->
+<section class="mb-8">
+  <h2 class="text-lg mb-3 font-semibold text-indigo-800 flex items-center gap-2">📒 Strategy Performance</h2>
+  <div class="rounded overflow-hidden shadow">
+    <table class="w-full text-xs">
+      <thead class="bg-indigo-50">
+        <tr>
+          <th class="py-2 px-3 text-center">Strategy</th>
+          <th class="py-2 text-center">Trades</th>
+          <th class="py-2 text-center">Win Rate</th>
+          <th class="py-2 text-center">PnL</th>
+          <th class="py-2 text-center">Sharpe</th>
+          <th class="py-2 text-center">Drawdown</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in strategy_stats %}
+        <tr class="hover:bg-indigo-100 transition">
+          <td class="py-1 px-3 text-center">{{ s.name }}</td>
+          <td class="py-1 text-center">{{ s.trades }}</td>
+          <td class="py-1 text-center">{{ (s.win_rate*100) | round(2) }}%</td>
+          <td class="py-1 text-center {% if s.pnl >= 0 %}text-green-700{% else %}text-red-700{% endif %}">₹{{ s.pnl | round(2) }}</td>
+          <td class="py-1 text-center">{{ s.sharpe | round(2) }}</td>
+          <td class="py-1 text-center text-red-600">₹{{ s.drawdown | round(2) }}</td>
+        </tr>
+        {% endfor %}
+        {% if not strategy_stats %}
+        <tr><td colspan="6" class="text-center text-gray-400 p-2">No strategy stats available.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Trades Table -->
+<section class="mb-8">
+  <h2 class="text-lg mb-3 font-semibold text-indigo-800 flex items-center gap-2">📑 Trades Executed Today</h2>
+  <div class="overflow-x-auto rounded shadow">
+    <table class="w-full text-xs">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="py-2 px-3 text-center">Time</th>
+          <th class="py-2 text-center">Symbol</th>
+          <th class="py-2 text-center">Type</th>
+          <th class="py-2 text-center">Qty</th>
+          <th class="py-2 text-center">Entry</th>
+          <th class="py-2 text-center">Exit</th>
+          <th class="py-2 text-center">P&L</th>
+          <th class="py-2 text-center">Status</th>
+          <th class="py-2 text-center">By Strategy</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in trades %}
+        <tr class="hover:bg-gray-50">
+          <td class="py-1 px-3 text-center">{{ t.filled_timestamp or t.timestamp }}</td>
+          <td class="py-1 text-center">{{ t.symbol }}</td>
+          <td class="py-1 text-center">{{ t.side }}</td>
+          <td class="py-1 text-center">{{ t.quantity }}</td>
+          <td class="py-1 text-center">₹{{ t.price | round(2) }}</td>
+          <td class="py-1 text-center">
+            {% if t.exit_price %}₹{{ t.exit_price | round(2) }}{% else %}-{% endif %}
+          </td>
+          <td class="py-1 text-center {% if t.pnl >= 0 %}text-green-700{% else %}text-red-700{% endif %}">
+            ₹{{ t.pnl | round(2) if t.pnl is not none else '-' }}
+          </td>
+          <td class="py-1 text-center">{{ t.status }}</td>
+          <td class="py-1 text-center">{{ t.strategy }}</td>
+        </tr>
+        {% endfor %}
+        {% if not trades %}
+        <tr>
+          <td colspan="9" class="text-center text-gray-400 py-8">No trades executed for this period.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="text-center text-xs text-gray-400 mt-8 mb-2">
+  &copy; {{ year }} AlgoTrade Pro · Generated automatically.
+</footer>

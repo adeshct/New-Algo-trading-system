@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AlgoTrade Pro - Indian Stock Market Platform</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://unpkg.com/htmx.org@1.9.4"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+
+<div class="trading-platform">
+  <!-- Header -->
+  <header class="platform-header">
+    <div class="header-content">
+      <h1 class="platform-title">Adesh's AlgoTrade Platform</h1>
+      <div class="market-status">
+        <div class="market-indicator">
+          <span class="indicator-dot active"></span>
+          <span>Market <span id="marketStatusText">Open</span></span>
+        </div>
+        <div class="time-display" id="currentTime"></div>
+      </div>
+
+      <!-- 🔄 Live broker status -->
+      <div id="broker-status-text">Checking broker...</div>
+
+        <script>
+        function updateBrokerStatus() {
+            fetch("/api/v1/broker/status")
+              .then(res => res.json())
+              .then(data => {
+                const el = document.getElementById("broker-status-text");
+                if (data.connected) {
+                    el.innerHTML = `Connected to <span class='text-green-600 font-semibold'>${data.broker}</span>`;
+                } else {
+                    el.innerHTML = `<span class="text-red-600">Not connected</span>`;
+                }
+              });
+        }
+
+      updateBrokerStatus();
+      setInterval(updateBrokerStatus, 10000);
+      </script>
+
+      
+
+      <div class="header-controls">
+        <button class="btn btn--outline btn--sm" id="emergencyStop">Emergency Stop</button>
+        <button class="btn btn--primary"
+            hx-get="/api/v1/main/settings"
+            hx-target="body"
+            hx-swap="beforeend">
+            ⚙️ Settings
+        </button>
+
+<div id="mainContent"></div>   <!-- The form/content loads here -->
+
+      </div>
+    </div>
+  </header>
+
+  <nav class="platform-nav">
+    <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+    <button class="nav-btn" data-tab="strategies">Strategies</button>
+    <button class="nav-btn" data-tab="trades">Trades</button>
+    <button class="nav-btn" data-tab="reports">Reports</button>
+    <button class="nav-btn" data-tab="logs">Logs</button>
+  </nav>
+
+  <main class="platform-main">
+    <!-- Dashboard Tab -->
+    <div class="tab-content active" id="dashboard">
+      <div class="dashboard-grid">
+        <!-- Trading Status Card -->
+        <div class="card status-card">
+          <div class="card__header">
+            <h3>Trading Status</h3>
+            <div class="status-controls">
+              <button class="btn btn--primary" id="startTrading">Start Trading</button>
+              <button class="btn btn--outline" id="stopTrading" disabled>Stop Trading</button>
+            </div>
+          </div>
+          <div class="card__body" hx-get="/api/v1/system/status" hx-trigger="load, every 10s" hx-swap="innerHTML">
+            Loading status...
+          </div>
+        </div>
+
+        <!-- P&L Card -->
+        <div class="card pnl-card">
+          <div class="card__header"><h3>Profit & Loss</h3></div>
+          <div class="card__body" hx-get="/api/v1/system/pnl" hx-trigger="load, every 5s" hx-swap="innerHTML">
+            Loading P&L...
+          </div>
+        </div>
+
+        <!-- Market Overview -->
+        <div class="card market-card">
+          <div class="card__header"><h3>Market Overview</h3></div>
+          <div class="card__body" hx-get="/api/v1/market/indices" hx-trigger="load, every 10s" hx-swap="innerHTML">
+            Loading indices...
+          </div>
+        </div>
+        
+        <!--Hodlings -->
+        <div class="card holdings-card">
+          <div class="card__header"><h3>Holdings</h3></div>
+            <div class="holdings-table" hx-get="/api/v1/broker/holdings" hx-trigger="load, every 30s" hx-swap="innerHTML">
+              Loading holdings...
+            </div>
+        </div>
+
+        <!-- Active Positions -->
+        <div class="card positions-card">
+          <div class="card__header"><h3>Active Positions</h3></div>
+          <div class="card__body">
+            <div class="positions-table" hx-get="/api/v1/positions/active" hx-trigger="load, every 7s" hx-swap="innerHTML">
+              Loading positions...
+            </div>
+          </div>
+        </div>
+
+   
+
+        <!-- Live Trades -->
+        <div class="card trades-card">
+          <div class="card__header"><h3>Live Trades</h3></div>
+          <div class="card__body">
+            <div class="trades-log", id="liveTrades" hx-get="/api/v1/trades/live" hx-trigger="load, every 4s, refresh" hx-swap="innerHTML">
+              Loading trades...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Strategies Tab -->
+    <div class="tab-content" id="strategies">
+      <div class="strategies-container">
+        <div class="strategies-header">
+          <h2>Strategy Management</h2>
+          <button class="btn btn--primary" id="addStrategy">Add Strategy</button>
+        </div>
+        <div id="strategy-cards"
+             hx-get="/dashboard/strategy-cards"
+             hx-trigger="load, every 8s"
+             hx-swap="innerHTML">
+          Loading strategies...
+        </div>
+      </div>
+    </div>
+
+    <!-- Trades Tab -->
+    <div class="tab-content" id="trades">
+      <div class="trades-container">
+        <div class="trades-header">
+          <h2>Trade History</h2>
+        </div>
+        <div class="trades-table" hx-get="/api/v1/trades/history" hx-trigger="load, every 20s" hx-swap="innerHTML">
+          Loading trade history...
+        </div>
+      </div>
+    </div>
+
+    
+
+    <!-- Reports Tab -->
+    <div class="tab-content" id="reports">
+      <div class="reports-container">
+        <div class="reports-header">
+          <h2>Reports & Analytics</h2>
+          <button class="btn btn--primary" id="generateReport">Generate Excel Report</button>
+        </div>
+        <div class="reports" hx-get="/api/v1/summary/reports" hx-trigger="load, every 10s" hx-swap="innerHTML">
+          Loading report...
+        </div>
+      </div>
+    </div>
+
+    
+    <!-- Logs Tab -->
+    <div class="tab-content" id="logs">
+      <div class="logs-container">
+        <div class="logs-header">
+          <h2>System Logs</h2>
+          <div class="logs-controls">
+            <button class="btn btn--outline btn--sm" id="clearLogs">Clear Logs</button>
+            <button class="btn btn--primary btn--sm" id="exportLogs">Export Logs</button>
+          </div>
+        </div>
+        <div class="logs-content">
+          <div class="log-viewer" id="systemLogs">
+            Loading logs...
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- WebSocket for real-time updates -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  let ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  
+  ws.onmessage = function(event) {
+    let msg = JSON.parse(event.data);
+    
+    if (msg.type === "strategy_pnl_update") {
+      // Update P&L display
+      let pnlEl = document.getElementById("pnl-" + msg.strategy);
+      if (pnlEl) pnlEl.innerText = "₹" + (msg.total_pnl || 0).toFixed(2);
+
+      // Update win rate
+      let winEl = document.getElementById("win-" + msg.strategy);
+      if (winEl) winEl.innerText = ((msg.win_rate || 0) * 100).toFixed(1) + "%";
+
+      // Update drawdown
+      let ddEl = document.getElementById("drawdown-" + msg.strategy);
+      if (ddEl) ddEl.innerText = "₹" + (msg.max_drawdown || 0).toFixed(2);
+
+      // Update Plotly chart
+      let chartDiv = document.getElementById("chart-" + msg.strategy);
+      if (chartDiv && msg.pnl_series && msg.pnl_series.length > 0) {
+        Plotly.react(chartDiv, [{
+          y: msg.pnl_series,
+          type: 'scatter',
+          mode: 'lines+markers',
+          line: {color: '#6366f1'}
+        }], {
+          title: msg.strategy + " - Live P&L",
+          xaxis: {title: "Trade #"},
+          yaxis: {title: "Cumulative P&L"},
+          margin: {t: 30, l: 40, r: 10, b: 40},
+          plot_bgcolor: "#f9fafb",
+          height: 200
+        }, {responsive: true});
+      }
+    }
+  };
+
+  ws.onclose = function() {
+    console.log("WebSocket connection closed. Attempting to reconnect in 5 seconds...");
+    setTimeout(() => location.reload(), 5000);
+  };
+
+  ws.onerror = function(error) {
+    console.error("WebSocket error:", error);
+  };
+});
+
+// Toggle strategy function
+function toggleStrategy(name, enable) {
+  fetch('/api/v1/strategies/control', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({strategy_name: name, enable: enable})
+  }).then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      htmx.ajax('GET', '/dashboard/strategy-cards', {target: '#strategy-cards'});
+    }
+  }).catch(error => console.error('Error toggling strategy:', error));
+}
+
+// Update current time
+function updateTime() {
+  const now = new Date();
+  document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+}
+setInterval(updateTime, 1000);
+updateTime();
+</script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
