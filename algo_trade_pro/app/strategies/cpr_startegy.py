@@ -27,7 +27,7 @@ class CPRMetaMLStrategy(BaseStrategy):
     """Production CPR Meta-Label Strategy with Probability-Calibrated Ensemble."""
 
     def __init__(self, name="CPR_Meta_ML", symbols=None, quantity=75, atm_offset=0):
-        symbols = symbols or ["NIFTY 50"]
+        symbols = symbols or ["NIFTY 50", "NIFTY BANK"]
         super().__init__(name, symbols,min_data_points= 2)
         self.qty = quantity
         self.atm_offset = atm_offset

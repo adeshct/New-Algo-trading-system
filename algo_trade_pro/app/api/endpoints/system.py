@@ -107,3 +107,13 @@ async def market_indices(request: Request):
         "request": request,
         "indices": indices
     })
+
+@router.get("/api/market_data/live")
+async def get_live_market_data():
+    from app.queue.signal_queue import latest_tick
+    return {"success": True, "data": latest_tick}
+
+@router.get("/api/signals/live")
+async def get_live_signals():
+    from app.queue.signal_queue import latest_signals
+    return {"success": True, "signals": latest_signals}
