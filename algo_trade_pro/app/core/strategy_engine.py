@@ -36,13 +36,14 @@ def resample(df: pd.DataFrame):
     # logger.info(f"print(df.index.dtype): {df.index.dtype}")
     # logger.info(f"print(df.index[:5]): {df.index[:5]}")
     # logger.info(f"The dataframe is as this: {df}")
-    ohlcv = df.resample("5min").agg({
+    ohlcv = df.resample("5min", label = "right", closed = "right").agg({
         "open": "first",
         "high": "max",
         "low": "min",
         "close": "last",
         "volume": "sum"
     })
+    
     return ohlcv.dropna()
 
 class StrategyEngine:
@@ -190,7 +191,7 @@ class StrategyEngine:
                             if symbol in self.symbol_data and len(self.symbol_data[symbol]) >= strategy.min_data_points:
                                 symbol_data[symbol] = self.symbol_data[symbol].copy()
                 else:
-                    if now.minute % 5 != 0 or now.second != 0:
+                    if now.minute % 5 != 0 or (now.second != 0 and now.second != 1):
                         mins_to_wait = 5 - now.minute % 5
                         logger.info("Sleeping for %d minutes", mins_to_wait)
                         #time.sleep(timedelta.total_seconds(getTimeOfDay(hours=int(now.hour+1 if int(now.minute+mins_to_wait)==60 else now.hour), minutes=int(0 if int(now.minute+mins_to_wait)==60 else int(now.minute+mins_to_wait)),seconds=0) - now))
@@ -211,6 +212,8 @@ class StrategyEngine:
                                 if len(df_5min) >= strategy.min_data_points:
                                     symbol_data[symbol] = df_5min
 
+                logger.info(f"Length of Symbol data: {len(symbol_data)}")
+                logger.info(f"Length of required symbols: {len(required_symbols)}")
                 # Execute strategy if we have enough data
                 if len(symbol_data) == len(required_symbols):
                     signals = strategy.generate_signals(symbol_data)

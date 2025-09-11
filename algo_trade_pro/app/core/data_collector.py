@@ -2,6 +2,8 @@ import threading
 from typing import Dict, Any, List
 from datetime import datetime
 import pandas as pd
+import sqlite3
+
 from app.queue.signal_queue import market_data_queue, websocket_queue
 from app.services.logger import get_logger
 from app.config.settings import get_settings
@@ -27,7 +29,40 @@ class DataCollector:
         self.subscribe_tokens = set()
 
         self.ws_collector = None
-        
+        # ---- NEW: SQLite DB connection ----
+        self.conn = sqlite3.connect('ticks.db', check_same_thread=False)
+        self.cursor = self.conn.cursor()
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ticks (
+                symbol TEXT,
+                timestamp TEXT,
+                open REAL,
+                high REAL,
+                low REAL,
+                close REAL,
+                volume REAL
+            )
+        """)
+        self.conn.commit()
+        # -----------------------------------
+    
+    def write_tick_to_db(self, tick: dict):
+        """Store single tick into the database."""
+        self.cursor.execute(
+            "INSERT INTO ticks (symbol, timestamp, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                tick.get("symbol"),
+                str(tick.get("timestamp")),
+                tick.get("open"),
+                tick.get("high"),
+                tick.get("low"),
+                tick.get("close"),
+                tick.get("volume", 0)
+            )
+        )
+        self.conn.commit()
+
+
     def add_symbols(self, symbols):
         with self._lock:
             for sym in symbols:
@@ -73,6 +108,7 @@ class DataCollector:
                 tick = self.out_queue.get(timeout=1)  # Wait for new ticks
 
                 symbol = tick["symbol"]
+                self.write_tick_to_db(tick) #Add to database
                 #logger.info(f"tick data: {tick}")
                 with self._lock:
                     #logger.info("Inside lock")
@@ -88,7 +124,7 @@ class DataCollector:
 
             except Exception as e:
                 # Timeout or other exception can be ignored/logged
-                logger.error(f"Inside Exception: execept: {e}")
+                logger.error(f"Inside Exception: websocket not available: {e}")
                 continue
 
     def stop(self):

@@ -158,8 +158,9 @@ async def active_positions(request: Request):
                 "symbol": pos["symbol"],
                 "side": pos["side"],
                 "quantity": float(pos["quantity"]),
-                "avg_price": float(pos["avg_price"]),
+                "avg_price": float(pos["buy_price"]),
                 "current_price": float(pos["current_price"]),
+                "sell_price": float(pos["sell_price"]),
                 "pnl": float(pos.get("pnl", 0.0) or 0.0)
             })
     except Exception as e:
@@ -194,6 +195,82 @@ async def broker_holdings(request: Request):
         "holdings": holdings,
         "error": error_msg
     })
+
+# app/api/endpoints/trades.py
+@router.get("/trades/active-orders", response_class=HTMLResponse)
+async def active_sl_target_orders(request: Request):
+    """Get all active SL/Target orders"""
+    try:
+        with get_db_session() as db:
+            # Get trades with active SL/Target orders
+            trades = db.query(Trade).filter(
+                (Trade.has_active_target == True) | 
+                (Trade.has_active_stoploss == True)
+            ).all()
+            
+            active_orders = []
+            for trade in trades:
+                if trade.has_active_target and trade.target_order_id:
+                    active_orders.append({
+                        'order_id': trade.target_order_id,
+                        'trade_id': trade.id,
+                        'symbol': trade.symbol,
+                        'type': 'TARGET',
+                        'price': trade.target,
+                        'status': 'ACTIVE'
+                    })
+                    
+                if trade.has_active_stoploss and trade.stoploss_order_id:
+                    active_orders.append({
+                        'order_id': trade.stoploss_order_id,
+                        'trade_id': trade.id,
+                        'symbol': trade.symbol,
+                        'type': 'STOPLOSS', 
+                        'price': trade.stop_loss,
+                        'status': 'ACTIVE'
+                    })
+                    
+    except Exception as e:
+        logger.error(f"Error fetching active orders: {e}")
+        active_orders = []
+
+    return templates.TemplateResponse("_active_sl_target_orders.html", {
+        "request": request,
+        "orders": active_orders
+    })
+
+@router.post("/trades/cancel-sl-target")
+async def cancel_sl_target_order(
+    request: Request,
+    order_id: str = Form(...),
+    order_type: str = Form(...) # 'TARGET' or 'STOPLOSS'
+):
+    """Cancel a specific SL or Target order"""
+    try:
+        controller = request.app.state.controller
+        result = controller.trade_executor.broker.cancel_order(order_id)
+        
+        if result.get('success'):
+            # Update trade record
+            with get_db_session() as db:
+                if order_type == 'TARGET':
+                    db.query(Trade).filter(Trade.target_order_id == order_id).update({
+                        'has_active_target': False
+                    })
+                elif order_type == 'STOPLOSS':
+                    db.query(Trade).filter(Trade.stoploss_order_id == order_id).update({
+                        'has_active_stoploss': False
+                    })
+                db.commit()
+            
+            return {"success": True, "message": f"{order_type} order cancelled"}
+        else:
+            return {"success": False, "error": result.get('error', 'Unknown error')}
+            
+    except Exception as e:
+        logger.error(f"Error cancelling {order_type} order {order_id}: {e}")
+        return {"success": False, "error": str(e)}
+
 
 @router.post("/trades/cancel")
 async def cancel_trade(

@@ -122,7 +122,19 @@
           </div>
         </div>
 
-   
+        <!-- In app/templates/index.html, add this to the dashboard grid -->
+        <div class="card sl-target-card">
+          <div class="card__header">
+            <h3>Active SL/Target Orders</h3>
+          </div>
+          <div class="card__body" 
+              id="activeOrders"
+              hx-get="/api/v1/trades/active-orders" 
+              hx-trigger="load, every 5s, refresh" 
+              hx-swap="innerHTML">
+            Loading active orders...
+          </div>
+        </div>
 
         <!-- Live Trades -->
         <div class="card trades-card">

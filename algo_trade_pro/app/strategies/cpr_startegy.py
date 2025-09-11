@@ -27,8 +27,8 @@ class CPRMetaMLStrategy(BaseStrategy):
     """Production CPR Meta-Label Strategy with Probability-Calibrated Ensemble."""
 
     def __init__(self, name="CPR_Meta_ML", symbols=None, quantity=75, atm_offset=0):
-        symbols = symbols or ["NIFTY 50", "NIFTY BANK"]
-        super().__init__(name, symbols,min_data_points= 2)
+        symbols = symbols or ["NIFTY 50"]
+        super().__init__(name, symbols,min_data_points= 3)
         self.qty = quantity
         self.atm_offset = atm_offset
 
@@ -55,7 +55,7 @@ class CPRMetaMLStrategy(BaseStrategy):
         signals = []
         sym = self.symbols[0]
         df = market_data.get(sym)
-        if df is None or len(df) < 2:
+        if df is None or len(df) < 3:
             return signals
         #logger.info("Calling previous session ohlc")
         prev_ohlc = get_previous_session_ohlc(df)
@@ -69,7 +69,7 @@ class CPRMetaMLStrategy(BaseStrategy):
         # Map each level to its neighbors (for targets)
         level_index_map = {lvl: i for i, lvl in enumerate(levels)}
 
-        bars = df.tail(2)
+        bars = df.tail(3)
         prev_bar = bars.iloc[0]
         curr_bar = bars.iloc[1]
         prev_close = prev_bar["close"]
@@ -160,9 +160,9 @@ class CPRMetaMLStrategy(BaseStrategy):
 
             if not self._ml_ensemble_filter(features):
                 logger.info("[%s] ML filter: REJECT (%s cross)", self.name, sig["level_crossed"])
-                continue
+                return
 
-            strike = nearest_strike(curr_close + self.atm_offset, 100)
+            strike = nearest_strike(curr_close + self.atm_offset, 50)
             ##expiry = self.broker.get_next_expiry(sym)
             expiry = dt.date(2025,8,28)
             opt_symbol = weekly_option_symbol(sym, strike, sig["opt_type"], expiry)
@@ -185,6 +185,7 @@ class CPRMetaMLStrategy(BaseStrategy):
                     "target": sig["target"],
                     "stoploss": sig["stoploss_price"],
                     "level_crossed": sig["level_crossed"],
+                    "underlying_symbol": sym,  # Add this
                 },
             )
             logger.info("[%s] Signal %s %s generated at %.2f (target %.2f, stop %.2f)", 
@@ -315,7 +316,7 @@ class CPRMetaMLStrategy(BaseStrategy):
         ])
         # Meta ensemble model gets base model probs as features
         final_prob = self.meta_model.predict_proba([base_probs])[0][1]
-        logger.debug(f"ML ensemble probabilities: {base_probs}, final: {final_prob:.2f}")
+        logger.info(f"ML ensemble probabilities: {base_probs}, final: {final_prob:.2f}")
         return final_prob >= threshold
 
     # ──────────────── TRAINING AND CALIBRATION (Nightly) ────────────────

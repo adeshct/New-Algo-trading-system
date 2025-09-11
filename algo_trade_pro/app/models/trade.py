@@ -3,7 +3,7 @@ import enum
 from enum import Enum
 from typing import Optional
 from datetime import datetime
-from sqlalchemy import Column, String, Float, Integer, Enum as PgEnum, DateTime, Text
+from sqlalchemy import Boolean, Column, String, Float, Integer, Enum as PgEnum, DateTime, Text
 
 from app.models.database import Base
 
@@ -48,10 +48,26 @@ class Trade(Base):
     stop_loss = Column(Float, nullable=True)                    # Suggested SL by strategy
     target = Column(Float, nullable=True)                       # Suggested target by strategy
 
+    pending_sl_target = Column(Float, nullable=True, default=None)  # For pending stop loss/target orders
+
     pnl = Column(Float, nullable=True, default=0.0)
     #commission = Column(Float, nullable=True, default=0.0)             # Calculated P&L
     exit_price = Column(Float, nullable=True)
     exit_timestamp = Column(DateTime, nullable=True)            # Optional exit time
+
+    # Enhanced fields for SL/Target monitoring
+    target_order_id = Column(String(50), nullable=True)     # Target order ID from broker
+    stoploss_order_id = Column(String(50), nullable=True)   # Stop-loss order ID from broker
+    has_active_target = Column(Boolean, default=False)      # Track if target order is active
+    has_active_stoploss = Column(Boolean, default=False)    # Track if SL order is active
+    parent_trade_id = Column(String(50), nullable=True)     # For linking SL/Target to parent
+    
+    # Execution tracking
+    target_triggered = Column(Boolean, default=False)
+    stoploss_triggered = Column(Boolean, default=False)
+    exit_reason = Column(String(20), nullable=True)         # 'TARGET', 'STOPLOSS', 'MANUAL'
+
+
 
     def __repr__(self):
         return (f"<Trade[{self.id}] {self.side} {self.quantity} {self.symbol} "

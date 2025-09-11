@@ -10,6 +10,7 @@ from app.services.logger import get_logger
 from app.config.settings import get_settings
 from app.brokers.zerodha import ZerodhaBroker
 from app.brokers.custom_broker import CustomBroker
+from app.core.sl_target_monitor import SLTargetMonitor
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -29,7 +30,9 @@ class AlgoController:
         self.strategy_engine = StrategyEngine() 
         self.trade_executor = TradeExecutor(self.broker)
         self.risk_manager = RiskManager()
-
+        
+        self.sl_target_monitor = SLTargetMonitor(self.broker, self.data_collector)
+        self.components['sl_target_monitor'] = self.sl_target_monitor
         
         self.components = {
             'data_collector': self.data_collector,
@@ -83,6 +86,7 @@ class AlgoController:
             ('strategy_engine', self.strategy_engine.run, "Strategy engine thread started"),
             ('trade_executor', self.trade_executor.run, "Trade executor thread started"),
             ('risk_manager', self.risk_manager.run, "Risk manager thread started")
+            ('sl_target_monitor', self.sl_target_monitor.run, "SL/Target monitor thread started")
         ]
         
         for name, target, message in thread_configs:

@@ -22,6 +22,7 @@ class TradeExecutor:
         self.broker = broker
         self.running = False
         self.pending_orders = {}  # order_id (str) -> trade_id (str)
+        self.active_sl_target_orders = {}
         self._lock = threading.Lock()
 
     def run(self):
@@ -67,7 +68,7 @@ class TradeExecutor:
 
             trade_id = f"{symbol}_{action}_{int(time.time())}_{threading.get_ident()}"
             side = TradeSide.BUY if action == "BUY" else TradeSide.SELL
-
+            metadata = signal.get('metadata', {})
             # 1. Create Trade record (insert into DB!)
             with get_db_session() as db:
                 trade = Trade(
@@ -79,6 +80,9 @@ class TradeExecutor:
                     status=TradeStatus.PENDING,
                     strategy=strategy,
                     timestamp=datetime.utcnow(),
+                    stop_loss=metadata.get('stoploss'),
+                    target=metadata.get('target'),
+                    underlying_symbol=metadata.get('underlying_symbol'),
                 )
                 db.add(trade)
                 db.commit()
@@ -103,6 +107,10 @@ class TradeExecutor:
                         "order_id": broker_order_id
                     })
                     db.commit()
+                
+                metadata = signal.get('metadata', {})
+                if metadata.get('stoploss') or metadata.get('target'):
+                    self._schedule_sl_target_placement(trade_id, metadata, symbol, quantity, action)
 
                 # 4. If FILLED immediately, handle; otherwise, add to pending
                 if order_result.get('status') == 'FILLED':
@@ -127,6 +135,82 @@ class TradeExecutor:
         except Exception as e:
             logger.exception(f"Error executing signal: {e}")
 
+    def _schedule_sl_target_placement(self, trade_id: str, metadata: dict, symbol: str, quantity: int, action: str):
+        """Schedule SL/Target orders to be placed after main order is filled"""
+        with self._lock:
+            self.pending_sl_target = self.pending_sl_target or {}
+            self.pending_sl_target[trade_id] = {
+                'symbol': symbol,
+                'quantity': quantity,
+                'action': action,
+                'stoploss': metadata.get('stoploss'),
+                'target': metadata.get('target'),
+                'timestamp': datetime.utcnow()
+            }
+
+    def _place_sl_target_orders(self, trade_id: str, sl_target_info: dict):
+        """Place SL and Target orders after main position is filled"""
+        try:
+            symbol = sl_target_info['symbol']
+            quantity = sl_target_info['quantity']
+            original_action = sl_target_info['action']
+            
+            # Determine exit side (opposite of entry)
+            exit_side = "SELL" if original_action == "BUY" else "BUY"
+            
+            target_order_id = None
+            stoploss_order_id = None
+            
+            # Place Target Order
+            if sl_target_info.get('target'):
+                target_result = self.broker.place_order(
+                    symbol=symbol,
+                    side=exit_side,
+                    quantity=quantity,
+                    price=sl_target_info['target'],
+                    order_type="LIMIT"
+                )
+                if target_result.get('success'):
+                    target_order_id = target_result.get('order_id')
+                    logger.info(f"Target order placed: {target_order_id} at {sl_target_info['target']}")
+
+            # Place Stop-Loss Order  
+            if sl_target_info.get('stoploss'):
+                sl_result = self.broker.place_order(
+                    symbol=symbol,
+                    side=exit_side,
+                    quantity=quantity,
+                    price=sl_target_info['stoploss'],
+                    order_type="SL-M"  # Stop-loss market order
+                )
+                if sl_result.get('success'):
+                    stoploss_order_id = sl_result.get('order_id')
+                    logger.info(f"Stop-loss order placed: {stoploss_order_id} at {sl_target_info['stoploss']}")
+
+            # Update trade record with SL/Target order IDs
+            with get_db_session() as db:
+                db.query(Trade).filter(Trade.id == trade_id).update({
+                    "target_order_id": target_order_id,
+                    "stoploss_order_id": stoploss_order_id,
+                    "has_active_target": target_order_id is not None,
+                    "has_active_stoploss": stoploss_order_id is not None
+                })
+                db.commit()
+
+            # Track these orders for monitoring
+            with self._lock:
+                if target_order_id:
+                    self.active_sl_target_orders[target_order_id] = {
+                        'trade_id': trade_id, 'type': 'TARGET', 'symbol': symbol
+                    }
+                if stoploss_order_id:
+                    self.active_sl_target_orders[stoploss_order_id] = {
+                        'trade_id': trade_id, 'type': 'STOPLOSS', 'symbol': symbol
+                    }
+
+        except Exception as e:
+            logger.error(f"Error placing SL/Target orders for {trade_id}: {e}")
+
     def _check_pending_orders(self):
         """Check status of pending orders and update database."""
         
@@ -144,6 +228,11 @@ class TradeExecutor:
                     filled_price = status_result.get('average_price')
                     self._handle_fill(trade_id, filled_price)
                     orders_to_remove.append(order_id)
+                    trade_id = self.pending_orders[order_id]
+                    if trade_id in getattr(self, 'pending_sl_target', {}):
+                        self._place_sl_target_orders(trade_id, self.pending_sl_target[trade_id])
+                        del self.pending_sl_target[trade_id]
+
                 elif status in ['CANCELLED', 'REJECTED']:
                     with get_db_session() as db:
                         db.query(Trade).filter(Trade.id == trade_id).update({
@@ -153,7 +242,8 @@ class TradeExecutor:
                     orders_to_remove.append(order_id)
                     logger.info(f"Order {status.lower()}: {order_id}")
                 
-                
+                self._check_sl_target_orders()
+
             except Exception as e:
                 logger.error(f"Error checking order status for {order_id}: {e}")
 
@@ -189,6 +279,92 @@ class TradeExecutor:
 
         except Exception as e:
             logger.error(f"Error handling fill for trade id {trade_id}: {e}")
+    
+    def _check_sl_target_orders(self):
+        """Monitor active SL/Target orders"""
+        orders_to_remove = []
+        
+        with self._lock:
+            sl_target_orders = list(self.active_sl_target_orders.keys())
+            
+        for order_id in sl_target_orders:
+            try:
+                status_result = self.broker.get_order_status(order_id)
+                status = status_result.get('status', 'UNKNOWN')
+                order_info = self.active_sl_target_orders[order_id]
+                
+                if status == 'COMPLETE':
+                    # SL or Target hit - update trade
+                    self._handle_sl_target_execution(order_id, order_info, status_result)
+                    orders_to_remove.append(order_id)
+                    
+                elif status in ['CANCELLED', 'REJECTED']:
+                    # Order cancelled/rejected - clean up
+                    self._handle_sl_target_cancellation(order_id, order_info)
+                    orders_to_remove.append(order_id)
+                    
+            except Exception as e:
+                logger.error(f"Error checking SL/Target order {order_id}: {e}")
+
+        # Clean up completed orders
+        with self._lock:
+            for order_id in orders_to_remove:
+                self.active_sl_target_orders.pop(order_id, None)
+
+    def _handle_sl_target_execution(self, order_id: str, order_info: dict, status_result: dict):
+        """Handle when SL or Target order gets executed"""
+        try:
+            trade_id = order_info['trade_id']
+            order_type = order_info['type']  # 'TARGET' or 'STOPLOSS'
+            exit_price = status_result.get('average_price')
+            
+            with get_db_session() as db:
+                trade = db.query(Trade).filter(Trade.id == trade_id).first()
+                if trade:
+                    # Update trade with exit details
+                    trade.exit_price = exit_price
+                    trade.exit_timestamp = datetime.utcnow()
+                    trade.status = TradeStatus.EXITED.value
+                    trade.exit_reason = order_type
+                    
+                    if order_type == 'TARGET':
+                        trade.target_triggered = True
+                        # Cancel the corresponding SL order
+                        if trade.stoploss_order_id:
+                            self._cancel_order_if_exists(trade.stoploss_order_id)
+                            trade.has_active_stoploss = False
+                            
+                    elif order_type == 'STOPLOSS':
+                        trade.stoploss_triggered = True
+                        # Cancel the corresponding Target order  
+                        if trade.target_order_id:
+                            self._cancel_order_if_exists(trade.target_order_id)
+                            trade.has_active_target = False
+                    
+                    # Calculate P&L
+                    if trade.side.value == "BUY":
+                        trade.pnl = (exit_price - trade.effective_price) * trade.quantity
+                    else:
+                        trade.pnl = (trade.effective_price - exit_price) * trade.quantity
+                        
+                    db.commit()
+                    
+                    logger.info(f"{order_type} executed for {trade_id}: Exit price {exit_price}, P&L: {trade.pnl}")
+
+        except Exception as e:
+            logger.error(f"Error handling SL/Target execution: {e}")
+
+    def _cancel_order_if_exists(self, order_id: str):
+        """Cancel an order if it exists and is still active"""
+        try:
+            result = self.broker.cancel_order(order_id)
+            if result.get('success'):
+                logger.info(f"Successfully cancelled order: {order_id}")
+                # Remove from active tracking
+                with self._lock:
+                    self.active_sl_target_orders.pop(order_id, None)
+        except Exception as e:
+            logger.warning(f"Could not cancel order {order_id}: {e}")
 
     def cancel_order(self, order_id: str) -> Dict[str, Any]:
         """Cancel a pending order."""

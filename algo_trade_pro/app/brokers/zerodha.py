@@ -171,7 +171,7 @@ class ZerodhaBroker(BrokerBase):
     def _resolve_exchange(self, symbol: str) -> str:
         """Determine exchange for symbol (can be enhanced with instrument mapping)."""
         # Default to NSE for most stocks
-        if symbol.upper() in ["NIFTY 50", "NIFTY BANK"]:
+        if symbol.upper() in ["NIFTY 50"]:
             return "NSE"
         elif symbol.upper() in ['SENSEX']:
             return "BSE"
@@ -188,8 +188,9 @@ class ZerodhaBroker(BrokerBase):
                     "symbol": pos["tradingsymbol"],
                     "side": "BUY" if pos["quantity"] >= 0 else "SELL",
                     "quantity": abs(pos["quantity"]),
-                    "avg_price": pos["average_price"],
-                    "current_price": pos["current_price"],  # must be fetched, if not present
+                    "buy_price": pos["buy_price"],
+                    "current_price": pos["last_price"],  # must be fetched, if not present
+                    "sell_price": pos["sell_price"],
                     "pnl": pos.get("pnl", 0.0)
                 })
             return result
