@@ -1,0 +1,49 @@
+<!-- app/templates/_active_sl_target_orders.html -->
+<div class="card">
+  <div class="card__header">
+    <h3>Active Stop-Loss & Target Orders</h3>
+  </div>
+  <div class="card__body">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Order ID</th>
+          <th>Symbol</th>
+          <th>Type</th>
+          <th>Price</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+        <tr>
+          <td>{{ order.order_id }}</td>
+          <td>{{ order.symbol }}</td>
+          <td>
+            <span class="status status--{{ 'info' if order.type == 'TARGET' else 'warning' }}">
+              {{ order.type }}
+            </span>
+          </td>
+          <td>₹{{ order.price | round(2) }}</td>
+          <td>{{ order.status }}</td>
+          <td>
+            <button class="btn btn--sm btn--outline"
+                    hx-post="/api/v1/trades/cancel-sl-target"
+                    hx-vals='{"order_id": "{{ order.order_id }}", "order_type": "{{ order.type }}"}'
+                    hx-confirm="Cancel {{ order.type }} order?"
+                    hx-on::after-request="htmx.trigger('#activeOrders', 'refresh')">
+              Cancel
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not orders %}
+        <tr>
+          <td colspan="6" class="text-center">No active SL/Target orders</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
