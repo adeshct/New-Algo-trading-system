@@ -7,7 +7,7 @@ def add_new_columns():
     
     try:
         #cursor.execute('ALTER TABLE trades ADD COLUMN pending_sl_target FLOAT DEFAULT NULL')
-        cursor.execute('ALTER TABLE trades ADD COLUMN underlying_symbol VARCHAR(20) DEFAULT NULL')
+        cursor.execute('ALTER TABLE trades ADD COLUMN stoploss_order_id VARCHAR(20) DEFAULT NULL')
         conn.commit()
         print("Columns added successfully!")
     except sqlite3.OperationalError as e:

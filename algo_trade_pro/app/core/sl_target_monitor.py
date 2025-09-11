@@ -111,7 +111,15 @@ class SLTargetMonitor:
                         db_trade.status = TradeStatus.EXITED
                         db_trade.exit_timestamp = datetime.utcnow()
                         db_trade.pending_sl_target = trigger_price
+                        db_trade.parent_trade_id=trade.id
                         db.commit()
+                    parent_trade = db.query(Trade).filter(Trade.id == trade.id).first()
+                    if parent_trade:
+                        parent_trade.status = TradeStatus.EXITED
+                        parent_trade.exit_timestamp = datetime.utcnow()
+                        parent_trade.pending_sl_target = trigger_price
+                    
+                    db.commit()
                 
                 # Remove from monitoring
                 del self.monitored_trades[trade.id]
